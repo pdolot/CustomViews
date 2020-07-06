@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <attr name="backgroundColor" format="color" />
+    <attr name="drawableColor" format="color" />
+    <attr name="strokeColor" format="color" tools:ignore="PrivateResource" />
+    <attr name="strokeWidth" format="dimension" tools:ignore="PrivateResource" />
+    <attr name="textFontFamily" format="reference" />
+    <attr name="hintFontFamily" format="reference" />
+    <attr name="colors" format="reference" />
+    <attr name="spaceBetween" format="dimension" />
+
+    <attr name="radius" format="dimension" />
+    <attr name="shadowRadius" format="dimension" />
+    <attr name="shadowDx" format="dimension" />
+    <attr name="shadowDy" format="dimension" />
+    <attr name="shadowColor" format="color" />
+    <attr name="roundedCorners" format="flags">
+        <flag name="topLeft" value="1" />
+        <flag name="topRight" value="2" />
+        <flag name="bottomRight" value="4" />
+        <flag name="bottomLeft" value="8" />
+        <flag name="all" value="15" />
+    </attr>
+    <attr name="gradientColors" format="reference" />
+
+
+    <attr name="text" format="string" />
+    <attr name="textSize" format="dimension" />
+    <attr name="textColor" format="color" />
+
+    <attr name="color" format="color" />
+    <attr name="activeColor" format="color" />
+
+    <declare-styleable name="MaterialEditText">
+        <attr name="hint" format="string" />
+        <attr name="activeColor" />
+        <attr name="textSize" />
+        <attr name="text" />
+        <attr name="hintSize" format="dimension" />
+        <attr name="textColor" />
+        <attr name="hintColor" format="color" />
+        <attr name="drawableColor" />
+        <attr name="drawableLeft" format="integer" />
+        <attr name="drawableRight" format="integer" />
+        <attr name="errorTextColor" format="color" />
+        <attr name="inputType">
+            <flag name="none" value="0x00000000" />
+            <flag name="text" value="0x00000001" />
+            <flag name="textCapCharacters" value="0x00001001" />
+            <flag name="textCapWords" value="0x00002001" />
+            <flag name="textCapSentences" value="0x00004001" />
+            <flag name="textAutoCorrect" value="0x00008001" />
+            <flag name="textAutoComplete" value="0x00010001" />
+            <flag name="textMultiLine" value="0x00020001" />
+            <flag name="textImeMultiLine" value="0x00040001" />
+            <flag name="textNoSuggestions" value="0x00080001" />
+            <flag name="textUri" value="0x00000011" />
+            <flag name="textEmailAddress" value="0x00000021" />
+            <flag name="textEmailSubject" value="0x00000031" />
+            <flag name="textShortMessage" value="0x00000041" />
+            <flag name="textLongMessage" value="0x00000051" />
+            <flag name="textPersonName" value="0x00000061" />
+            <flag name="textPostalAddress" value="0x00000071" />
+            <flag name="textPassword" value="0x00000081" />
+            <flag name="textVisiblePassword" value="0x00000091" />
+            <flag name="textWebEditText" value="0x000000a1" />
+            <flag name="textFilter" value="0x000000b1" />
+            <flag name="textPhonetic" value="0x000000c1" />
+            <flag name="textWebEmailAddress" value="0x000000d1" />
+            <flag name="textWebPassword" value="0x000000e1" />
+            <flag name="number" value="0x00000002" />
+            <flag name="numberSigned" value="0x00001002" />
+            <flag name="numberDecimal" value="0x00002002" />
+            <flag name="numberPassword" value="0x00000012" />
+            <flag name="phone" value="0x00000003" />
+            <flag name="datetime" value="0x00000004" />
+            <flag name="date" value="0x00000014" />
+            <flag name="time" value="0x00000024" />
+        </attr>
+        <attr name="maxLines" format="integer" />
+        <attr name="maxLength" format="integer" />
+        <attr name="shouldRightIconHide" format="boolean" />
+        <attr name="shouldIconChangeColor" format="boolean" />
+        <attr name="textFontFamily" />
+        <attr name="hintFontFamily" />
+    </declare-styleable>
+
+    <declare-styleable name="RoundedView">
+        <attr name="backgroundColor" />
+        <attr name="strokeColor" />
+        <attr name="strokeWidth" />
+        <attr name="gradientEnabled" format="boolean" />
+        <attr name="gradientColors" />
+        <attr name="gradientAngle" format="integer" />
+        <attr name="maxRadius" format="dimension" />
+        <attr name="minRadius" format="dimension" />
+        <attr name="shadowRadius" />
+        <attr name="shadowDx" />
+        <attr name="shadowDy" />
+        <attr name="shadowColor" />
+        <attr name="roundedCorners" />
+
+        <attr name="border" format="flags">
+            <flag name="left" value="1" />
+            <flag name="top" value="2" />
+            <flag name="right" value="4" />
+            <flag name="bottom" value="8" />
+            <flag name="all" value="15" />
+        </attr>
+    </declare-styleable>
+
+    <declare-styleable name="RoundedView3D">
+        <attr name="backgroundColor" />
+        <attr name="gradientColors" />
+        <attr name="radius" />
+        <attr name="shadowRadius" />
+        <attr name="roundedCorners" />
+        <attr name="embossing" format="enum">
+            <enum name="concave" value="0" />
+            <enum name="convex" value="1" />
+        </attr>
+    </declare-styleable>
+
+    <declare-styleable name="FlexibleProgressBar">
+        <attr name="viewScaleY" format="float" />
+        <attr name="progress" format="float" />
+        <attr name="strokeWidth"/>
+        <attr name="secondaryProgressColor" format="color"/>
+        <attr name="progressColor" format="color"/>
+    </declare-styleable>
+
+    <declare-styleable name="SkewRoundedView">
+        <attr name="backgroundColor" />
+        <attr name="radius" />
+        <attr name="strokeWidth" />
+        <attr name="strokeColor" />
+        <attr name="skew" format="dimension" />
+        <attr name="shadowRadius" />
+        <attr name="shadowDx" />
+        <attr name="shadowDy" />
+        <attr name="shadowColor" />
+        <attr name="skewCorners" format="flags">
+            <flag name="topLeft" value="1" />
+            <flag name="topRight" value="2" />
+            <flag name="bottomRight" value="4" />
+            <flag name="bottomLeft" value="8" />
+            <flag name="all" value="15" />
+        </attr>
+    </declare-styleable>
+
+    <declare-styleable name="CircleProgressBars">
+        <attr name="count" format="integer" />
+        <attr name="colors" />
+        <attr name="bgColors" format="reference" />
+        <attr name="strokeWidths" format="reference" />
+        <attr name="diffStrokeWidthsEnabled" format="boolean" />
+        <attr name="progresses" format="reference" />
+        <attr name="progressesLabels" format="reference" />
+        <attr name="textEnabled" format="boolean" />
+        <attr name="spaceBetween" />
+        <attr name="maxProgressAngle" format="integer" />
+        <attr name="backgroundEnabled" format="boolean" />
+        <attr name="touchEnabled" format="boolean" />
+        <attr name="thumbsEnabled" format="boolean" />
+        <attr name="cpb_fontFamily" format="reference" />
+        <attr name="strokeWidth" />
+        <attr name="strokeCap" format="enum">
+            <enum name="ROUND" value="0" />
+            <enum name="BUTT" value="1" />
+            <enum name="SQUARE" value="2" />
+        </attr>
+    </declare-styleable>
+
+    <declare-styleable name="CircleChart">
+        <attr name="strokeWidth" />
+        <attr name="colors" />
+        <attr name="spaceBetween" />
+        <attr name="dataRef" format="reference" />
+    </declare-styleable>
+
+    <declare-styleable name="RoundedSView">
+        <attr name="radius" />
+        <attr name="spaceHeight" format="dimension" />
+        <attr name="shadowRadius" />
+        <attr name="shadowDx" />
+        <attr name="shadowDy" />
+        <attr name="shadowColor" />
+        <attr name="shapeBackgroundColor" format="color" />
+        <attr name="mirrorReflectionEnabled" format="boolean" />
+        <attr name="displayOn" format="flags">
+            <flag name="top" value="1" />
+            <flag name="bottom" value="2" />
+            <flag name="merged" value="4" />
+        </attr>
+    </declare-styleable>
+
+    <declare-styleable name="OverlappingButton">
+        <attr name="buttonRadius" format="dimension" />
+        <attr name="spaceWidth" format="dimension" />
+        <attr name="roundRadius" format="dimension" />
+        <attr name="backgroundColor" />
+        <attr name="thumbColor" format="color" />
+        <attr name="disableColor" format="color" />
+        <attr name="clickEnabled" format="boolean" />
+        <attr name="verticalBias" format="float" />
+        <attr name="icon" format="reference" />
+        <attr name="iconTint" format="color" />
+        <attr name="iconDisableTint" format="color" />
+        <attr name="clipOut" format="boolean" />
+        <attr name="clipOutBackgroundColor" format="color" />
+    </declare-styleable>
+
+    <declare-styleable name="Spinner">
+        <attr name="defaultValue" format="string" />
+    </declare-styleable>
+
+    <declare-styleable name="Button">
+        <attr name="text" />
+        <attr name="textSize" />
+        <attr name="textColor" />
+        <attr name="but_fontFamily" format="reference" />
+    </declare-styleable>
+
+    <declare-styleable name="FrameView">
+        <attr name="color" />
+        <attr name="strokeWidth" />
+    </declare-styleable>
+
+    <declare-styleable name="Indicator">
+        <attr name="itemCount" format="integer" />
+        <attr name="spaceBetween" />
+        <attr name="indicatorWidth" format="dimension" />
+        <attr name="strokeWidth" />
+        <attr name="activeStrokeWidth" format="dimension" />
+        <attr name="color" />
+        <attr name="activeColor" />
+    </declare-styleable>
+
+</resources>

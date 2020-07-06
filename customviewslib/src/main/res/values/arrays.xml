@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <array name="gradientColors">
+        <item>#ffffff</item>
+        <item>#E6E6E6</item>
+        <item>#CCCCCC</item>
+        <item>#BBBBBB</item>
+        <item>#A1A1A1</item>
+        <item>#878787</item>
+        <item>#6D6D6D</item>
+        <item>#535353</item>
+        <item>#393939</item>
+        <item>#1A1A1A</item>
+        <item>#000000</item>
+    </array>
+
+
+    <array name="rounded3dGradientColors">
+        <item>#ffffff</item>
+        <item>#ffffff</item>
+        <item>#ffffff</item>
+        <item>#ffffff</item>
+        <item>#ffffff</item>
+        <item>#ffffff</item>
+        <item>#ffffff</item>
+        <item>#4DFFFFFF</item>
+        <item>#4DCCCCCC</item>
+        <item>#CCCCCC</item>
+        <item>#CCCCCC</item>
+        <item>#CCCCCC</item>
+        <item>#CCCCCC</item>
+        <item>#CCCCCC</item>
+        <item>#CCCCCC</item>
+        <item>#CCCCCC</item>
+    </array>
+
+    <array name="blueGradient">
+        <item>#42a5f5</item>
+        <item>#1976d2</item>
+    </array>
+
+    <array name="whiteTransparent">
+        <item>#ffffff</item>
+        <item>#66FFFFFF</item>
+        <item>#33FFFFFF</item>
+        <item>#00FFFFFF</item>
+    </array>
+
+    <array name="brightPrimaryTransparent">
+        <item>#C8BEE1</item>
+        <item>#ffffff</item>
+        <item>#ffffff</item>
+    </array>
+
+    <array name="purpleGradient">
+        <item>#7e57c2</item>
+        <item>#5e35b1</item>
+    </array>
+
+    <array name="bluePurpleGradient">
+        <item>#5e35b1</item>
+        <item>#42a5f5</item>
+    </array>
+
+    <array name="darkBlueGradient">
+        <item>#455a64</item>
+        <item>#1c313a</item>
+    </array>
+
+    <array name="greenGradient">
+        <item>#66bb6a</item>
+        <item>#43a047</item>
+    </array>
+
+    <array name="grayGradient">
+        <item>#E6E6E6</item>
+        <item>#E6E6E6</item>
+    </array>
+
+    <array name="primaryBlueGradient">
+        <item>#4E54C8</item>
+        <item>#8F94FB</item>
+    </array>
+
+    <array name="primaryGreenGradient">
+        <item>#11998e</item>
+        <item>#38EF7D</item>
+    </array>
+
+    <array name="primaryGradient">
+        <item>#3425AF</item>
+        <item>#C56CD6</item>
+    </array>
+
+    <array name="secondaryGradient">
+        <item>#603ABB</item>
+        <item>#C56CD6</item>
+    </array>
+
+    <array name="colors">
+        <item>#3949AB</item>
+        <item>#1E88E5</item>
+        <item>#00ACC1</item>
+        <item>#00897B</item>
+        <item>#43A047</item>
+        <item>#7CB342</item>
+        <item>#C0CA33</item>
+        <item>#FDD835</item>
+        <item>#FFB300</item>
+        <item>#FB8C00</item>
+        <item>#F4511E</item>
+        <item>#E53935</item>
+        <item>#D81B60</item>
+        <item>#5E35B1</item>
+    </array>
+
+    <array name="chartColors">
+        <item>#66bb6a</item>
+        <item>#ffa726</item>
+        <item>#ab47bc</item>
+    </array>
+
+    <array name="progressColors">
+        <item>#64B5F6</item>
+        <item>#66bb6a</item>
+        <item>#FFD54F</item>
+        <item>#BA68C8</item>
+    </array>
+
+    <array name="progressBarBgColors">
+        <item>#F2F2F2</item>
+        <item>#F2F2F2</item>
+        <item>#F2F2F2</item>
+        <item>#F2F2F2</item>
+    </array>
+
+    <array name="progressStrokeWidths">
+        <item>16dp</item>
+        <item>16dp</item>
+        <item>16dp</item>
+        <item>16dp</item>
+    </array>
+
+    <array name="progressLabels">
+        <item>ENERGIA</item>
+        <item>BIAŁKA</item>
+        <item>TŁUSZCZE</item>
+        <item>WĘGLOWODANY</item>
+    </array>
+
+    <array name="bgColors">
+        <item>#FA242424</item>
+        <item>#E8242424</item>
+        <item>#D6242424</item>
+        <item>#C4242424</item>
+        <item>#B3242424</item>
+        <item>#A1242424</item>
+        <item>#8F242424</item>
+        <item>#7D242424</item>
+        <item>#6B242424</item>
+        <item>#59242424</item>
+        <item>#47242424</item>
+        <item>#36242424</item>
+        <item>#24242424</item>
+        <item>#12242424</item>
+    </array>
+
+    <array name="progresses">
+        <item>0.7</item>
+        <item>0.5</item>
+        <item>0.82</item>
+        <item>0.73</item>
+        <item>0.64</item>
+        <item>0.55</item>
+        <item>0.46</item>
+        <item>0.37</item>
+        <item>0.28</item>
+        <item>0.19</item>
+        <item>0.10</item>
+        <item>0.0</item>
+    </array>
+
+    <array name="strokeWidths">
+        <item>12dp</item>
+        <item>12dp</item>
+        <item>12dp</item>
+        <item>12dp</item>
+        <item>12dp</item>
+        <item>12dp</item>
+        <item>12dp</item>
+        <item>12dp</item>
+        <item>12dp</item>
+        <item>12dp</item>
+        <item>12dp</item>
+        <item>12dp</item>
+    </array>
+
+    <array name="emptyProgresses">
+        <item>0.0</item>
+        <item>0.0</item>
+        <item>0.0</item>
+        <item>0.0</item>
+        <item>0.0</item>
+        <item>0.0</item>
+        <item>0.0</item>
+        <item>0.0</item>
+        <item>0.0</item>
+        <item>0.0</item>
+        <item>0.0</item>
+        <item>0.0</item>
+    </array>
+
+    <array name="circleChartData">
+        <item>30.0</item>
+        <item>30.0</item>
+        <item>40.0</item>
+    </array>
+
+    <array name="progressLabel">
+        <item>FIRST</item>
+        <item>SECOND</item>
+        <item>THIRD</item>
+        <item>FOURTH</item>
+        <item>FIFTH</item>
+        <item>SIXTH</item>
+        <item>SEVENTH</item>
+        <item>EIGHTH</item>
+        <item>NINTH</item>
+        <item>TENTH</item>
+        <item>ELEVENTH</item>
+        <item>TWELFTH</item>
+    </array>
+
+
+</resources>
