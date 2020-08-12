@@ -253,6 +253,7 @@ class SwipeLayout @JvmOverloads constructor(
         children.forEach {
             it.translateTo(translation)
         }
+        
     }
 
     private fun setViews() {
