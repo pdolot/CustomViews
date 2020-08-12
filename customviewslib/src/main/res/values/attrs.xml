@@ -236,5 +236,14 @@
         <attr name="color" />
         <attr name="activeColor" />
     </declare-styleable>
+    
+    <declare-styleable name="SwipeLayout">
+        <attr name="childrenArrangement" format="string"/>
+        <attr name="swipeBehaviour" format="enum">
+            <enum name="SEQUENTIALLY" value="0" />
+            <enum name="TO_LAST" value="1" />
+        </attr>
+        <attr name="allowToCompleteShift" format="boolean"/>
+    </declare-styleable>
 
 </resources>
