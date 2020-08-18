@@ -122,6 +122,22 @@
         </attr>
     </declare-styleable>
 
+    <declare-styleable name="OuterRoundedView">
+        <attr name="backgroundColor" />
+        <attr name="radius" />
+        <attr name="roundedCorners" />
+    </declare-styleable>
+
+    <declare-styleable name="OuterSideRoundedView">
+        <attr name="backgroundColor" />
+        <attr name="radius" />
+        <attr name="side" format="flags">
+            <flag name="left" value="9" />
+            <flag name="right" value="6" />
+            <flag name="all" value="15" />
+        </attr>
+    </declare-styleable>
+
     <declare-styleable name="FlexibleProgressBar">
         <attr name="viewScaleY" format="float" />
         <attr name="progress" format="float" />
@@ -243,6 +259,7 @@
             <enum name="SEQUENTIALLY" value="0" />
             <enum name="TO_LAST" value="1" />
         </attr>
+        <attr name="radius" />
         <attr name="allowToCompleteShift" format="boolean"/>
     </declare-styleable>
 
