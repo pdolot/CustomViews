@@ -4,702 +4,1183 @@ import android.animation.Animator
 import android.animation.AnimatorSet
 import android.animation.ValueAnimator
 import android.content.Context
-import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
 import android.util.AttributeSet
+import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
-import android.view.ViewGroup
 import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.view.*
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
 import com.dolotdev.customviewslib.R
-import com.dolotdev.customviewslib.extension.*
-import com.dolotdev.customviewslib.roundedView.OuterRoundedView
-import com.dolotdev.customviewslib.swipeLayout.SwipeLayout.ViewArrangement.*
+import com.dolotdev.customviewslib.extension.translateBy
+import com.dolotdev.customviewslib.extension.translateTo
 import kotlin.math.abs
 
+
 class SwipeLayout @JvmOverloads constructor(
-    context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
+	context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : ConstraintLayout(context, attrs, defStyleAttr) {
 
-    private var surfaceView: Pair<View, Boolean>? = null
-    private var outerRoundedView: View? = null
-    private var leftViews: MutableList<Pair<View, Boolean>>? =
-        null  // if second is true that means that view is rounded
-    private var rightViews: MutableList<Pair<View, Boolean>>? =
-        null // if second is true that means that view is rounded
-    private var bottomViews: MutableList<View>? = null
-    private var lastRightView: Pair<View, Boolean>? = null
-    private var lastLeftView: Pair<View, Boolean>? = null
-
-    private var translatableViews: MutableList<View>? = null
-
-    private var rightViewsWidth = 0
-    private var leftViewsWidth = 0
-    private var surfaceViewWidth = 0
-
-    private var currentRightIndex = 0
-    private var currentLeftIndex = 0
-
-    private var fullTranslation = 0
-    private var maxTranslationLeft = 0
-    private var maxTranslationRight = 0
-
-    private var touchX = 0f
-    private var previousTouchX = 0f
-    private var swipeRatio = 0.4f
-
-    private var swipeListener: OnSwipeListener? = null
-
-    private var childrenArrangement: List<ViewArrangement>? = null
-
-    private val animatorSet = AnimatorSet()
-    private val animatorList = ArrayList<Animator>()
-
-    private var childSwipeBehaviour = ChildSwipeBehaviour.TO_LAST
-    private var swipeBehaviour: SwipeBehaviour = SwipeBehaviour.SWIPE_LOCKED_TO_SIDE_VIEWS
-
-    private var allowToCompleteShift = true
-    private var canSwipeLeft = true
-    private var canSwipeRight = true
-    private var swipeDirection: SwipeDirection = SwipeDirection.NONE
-
-    private var cornerRadius = 0
-
-    init {
-        initAttrs(context, attrs, defStyleAttr)
-    }
-
-    private fun initAttrs(context: Context, attrs: AttributeSet?, defStyleAttr: Int) {
-        val a = context.theme.obtainStyledAttributes(
-            attrs,
-            R.styleable.SwipeLayout,
-            defStyleAttr,
-            0
-        )
-        childSwipeBehaviour =
-            ChildSwipeBehaviour.values()[a.getInteger(R.styleable.SwipeLayout_swipeBehaviour, 0)]
-        allowToCompleteShift = a.getBoolean(R.styleable.SwipeLayout_allowToCompleteShift, false)
-        childrenArrangement = a.getString(R.styleable.SwipeLayout_childrenArrangement)?.split(";")
-            ?.map { valueOf(it) }
-
-        cornerRadius = a.getDimensionPixelSize(R.styleable.SwipeLayout_radius, 0)
-        a.recycle()
-    }
-
-    fun setOnSwipeListener(swipeListener: OnSwipeListener) {
-        this.swipeListener = swipeListener
-    }
-
-    fun setOnSwipeListener(
-        onSwipe: (progress: Float, direction: SwipeDirection) -> Unit,
-        onSwiped: (direction: SwipeDirection) -> Unit
-    ) {
-        setOnSwipeListener(object :
-            OnSwipeListener {
-            override fun onSwipe(progress: Float, direction: SwipeDirection) {
-                onSwipe(progress, direction)
-            }
-
-            override fun onSwiped(direction: SwipeDirection) {
-                onSwiped(direction)
-            }
-
-        })
-    }
-
-
-    private fun initSwipe() {
-        when (swipeBehaviour) {
-            SwipeBehaviour.ONLY_SURFACE_AND_BOTTOM -> {
-                maxTranslationRight = 0
-                maxTranslationLeft = 0
-
-                if (canSwipeLeft && canSwipeRight) {
-                    maxTranslationRight = surfaceViewWidth
-                    maxTranslationLeft = -surfaceViewWidth
-                } else if (canSwipeRight && !canSwipeLeft) {
-                    maxTranslationRight = surfaceViewWidth
-                } else if (!canSwipeRight && canSwipeLeft) {
-                    maxTranslationLeft = -surfaceViewWidth
-                }
-            }
-            SwipeBehaviour.SWIPE_LOCKED_TO_SIDE_VIEWS -> {
-                maxTranslationRight = 0
-                maxTranslationLeft = 0
-
-                if (childSwipeBehaviour == ChildSwipeBehaviour.SEQUENTIALLY) {
-                    rightViews?.apply {
-                        if (this.isNotEmpty() && canSwipeLeft) {
-                            for (i in 0..currentRightIndex)
-                                maxTranslationLeft =
-                                    -(rightViews?.get(currentRightIndex)?.first?.measuredWidth ?: 0)
-                        }
-                    }
-                    leftViews?.apply {
-                        if (this.isNotEmpty() && canSwipeRight) {
-                            maxTranslationRight =
-                                leftViews?.get(currentLeftIndex)?.first?.measuredWidth ?: 0
-                        }
-                    }
-                } else {
-                    if (canSwipeLeft && canSwipeRight) {
-                        maxTranslationLeft = -rightViewsWidth
-                        maxTranslationRight = leftViewsWidth
-                    } else if (canSwipeRight && !canSwipeLeft) {
-                        maxTranslationRight = leftViewsWidth
-                    } else if (!canSwipeRight && canSwipeLeft) {
-                        maxTranslationLeft = -rightViewsWidth
-                    }
-                }
-            }
-            SwipeBehaviour.FULL_SWIPE_WITH_SIDE_VIEWS -> {
-            }
-            SwipeBehaviour.FULL_SWIPE -> {
-            }
-        }
-
-        surfaceView?.first?.setOnTouchListener { v, e ->
-            when (swipeBehaviour) {
-                SwipeBehaviour.ONLY_SURFACE_AND_BOTTOM -> swipeOnlySurfaceAndBottomView(v, e)
-                SwipeBehaviour.SWIPE_LOCKED_TO_SIDE_VIEWS -> swipeLockedToSideViews(v, e)
-                SwipeBehaviour.FULL_SWIPE_WITH_SIDE_VIEWS -> swipeOnlySurfaceAndBottomView(v, e)
-                SwipeBehaviour.FULL_SWIPE -> swipeOnlySurfaceAndBottomView(v, e)
-            }
-        }
-    }
-
-    // Swipe behaviours
-
-    private fun swipeOnlySurfaceAndBottomView(v: View, e: MotionEvent): Boolean {
-        return when (e.action) {
-            MotionEvent.ACTION_DOWN -> {
-                touchX = e.x
-                true
-            }
-            MotionEvent.ACTION_MOVE -> {
-                val translation = e.x - touchX
-                if (v.translationX + translation >= maxTranslationLeft && v.translationX + translation <= maxTranslationRight) {
-                    translateBy(translation)
-                } else if (v.translationX + translation < maxTranslationLeft) {
-                    translateTo(maxTranslationLeft.toFloat())
-                } else if (v.translationX + translation > maxTranslationRight) {
-                    translateTo(maxTranslationRight.toFloat())
-                }
-                getSwipeDirection(v.translationX)
-                true
-            }
-            MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_UP -> {
-                val localSwipeDirection = if (v.translationX < 0) {
-                    SwipeDirection.LEFT
-                } else {
-                    SwipeDirection.RIGHT
-                }
-
-                val ratio = abs(v.translationX / surfaceViewWidth)
-
-                if (ratio >= swipeRatio) {
-                    when (localSwipeDirection) {
-                        SwipeDirection.LEFT -> {
-                            animateTranslation(-surfaceViewWidth.toFloat())
-                        }
-                        SwipeDirection.RIGHT -> {
-                            animateTranslation(surfaceViewWidth.toFloat())
-                        }
-                        SwipeDirection.NONE -> {
-                        }
-                    }
-                } else {
-                    reset(true)
-                }
-                false
-            }
-            else -> false
-        }
-    }
-
-    private fun swipeLockedToSideViews(v: View, e: MotionEvent): Boolean {
-        return when (e.action) {
-            MotionEvent.ACTION_DOWN -> {
-                touchX = e.x
-                true
-            }
-            MotionEvent.ACTION_MOVE -> {
-                val translation = e.x - touchX
-                if (v.translationX + translation >= maxTranslationLeft && v.translationX + translation <= maxTranslationRight) {
-                    translateBy(translation)
-                } else if (v.translationX + translation < maxTranslationLeft) {
-                    translateTo(maxTranslationLeft.toFloat())
-                } else if (v.translationX + translation > maxTranslationRight) {
-                    translateTo(maxTranslationRight.toFloat())
-                }
-                true
-            }
-            MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_UP -> {
-                var localSwipeDirection = SwipeDirection.LEFT
-                val ratio = if (v.translationX < 0) {
-                    abs(v.translationX / maxTranslationLeft)
-                } else {
-                    localSwipeDirection = SwipeDirection.RIGHT
-                    abs(v.translationX / maxTranslationRight)
-                }
-
-                if (ratio >= swipeRatio) {
-                    when (localSwipeDirection) {
-                        SwipeDirection.LEFT -> {
-                            animateTranslation(maxTranslationLeft.toFloat())
-                            unlockNextRightView()
-                        }
-                        SwipeDirection.RIGHT -> {
-                            animateTranslation(maxTranslationRight.toFloat())
-                            unlockNextLeftView()
-                        }
-                        SwipeDirection.NONE -> {
-                        }
-                    }
-                } else {
-                    reset(true)
-                }
-                false
-            }
-            else -> false
-        }
-    }
-
-    private fun getSwipeDirection(nextX: Float) {
-        swipeDirection = when {
-            nextX > previousTouchX -> {
-                SwipeDirection.RIGHT
-            }
-            nextX < previousTouchX -> {
-                SwipeDirection.LEFT
-            }
-            else -> {
-                SwipeDirection.NONE
-            }
-        }
-        previousTouchX = nextX
-    }
-
-    private fun unlockNextRightView() {
-        if (childSwipeBehaviour == ChildSwipeBehaviour.SEQUENTIALLY) {
-            rightViews?.let {
-                if (currentRightIndex + 1 < it.size) {
-                    currentRightIndex++
-                    maxTranslationLeft -= rightViews?.get(currentRightIndex)?.first?.measuredWidth
-                        ?: 0
-                }
-            }
-        }
-    }
-
-    private fun unlockNextLeftView() {
-        if (childSwipeBehaviour == ChildSwipeBehaviour.SEQUENTIALLY) {
-            leftViews?.let {
-                if (currentLeftIndex + 1 < it.size) {
-                    currentLeftIndex++
-                    maxTranslationRight += rightViews?.get(currentLeftIndex)?.first?.measuredWidth
-                        ?: 0
-                }
-            }
-        }
-    }
-
-    fun reset(animation: Boolean) {
-        if (animation) {
-            animateTranslation(0f)
-        } else {
-            translateTo(0f)
-        }
-
-        if (childSwipeBehaviour == ChildSwipeBehaviour.SEQUENTIALLY) {
-            rightViews?.apply {
-                if (this.isNotEmpty()) {
-                    maxTranslationLeft =
-                        -(rightViews?.get(currentRightIndex)?.first?.measuredWidth ?: 0)
-                }
-            }
-            leftViews?.apply {
-                if (this.isNotEmpty()) {
-                    maxTranslationRight =
-                        leftViews?.get(currentLeftIndex)?.first?.measuredWidth ?: 0
-                }
-            }
-        }
-        currentRightIndex = 0
-        currentLeftIndex = 0
-    }
-
-    private fun animateTranslation(translation: Float) {
-        animatorList.clear()
-        translatableViews?.forEach {
-            animatorList.add(createAnimator(it, translation))
-        }
-
-        animatorSet.apply {
-            playTogether(animatorList)
-            duration = 500
-            interpolator = FastOutSlowInInterpolator()
-            start()
-        }
-    }
-
-    private fun createAnimator(view: View, translation: Float): ValueAnimator {
-        val animator = ValueAnimator.ofFloat(view.translationX, translation)
-        animator.addUpdateListener {
-            view.translationX = it.animatedValue as Float
-        }
-        return animator
-    }
-
-    private fun translateBy(translation: Float) {
-        translatableViews?.forEach {
-            it.translateBy(translation)
-        }
-    }
-
-    private fun translateTo(translation: Float) {
-        translatableViews?.forEach {
-            it.translateTo(translation)
-        }
-    }
-
-    private fun recreateFields() {
-        maxTranslationLeft = 0
-        maxTranslationRight = 0
-        fullTranslation = measuredWidth
-        rightViewsWidth = 0
-        leftViewsWidth = 0
-        surfaceViewWidth = 0
-
-        leftViews = ArrayList()
-        rightViews = ArrayList()
-        bottomViews = ArrayList()
-        translatableViews = ArrayList()
-    }
-
-    private fun measureViewsWidths() {
-        rightViewsWidth = rightViews?.map { it.first.measuredWidth }?.sum() ?: 0
-        leftViewsWidth = leftViews?.map { it.first.measuredWidth }?.sum() ?: 0
-        surfaceViewWidth = surfaceView?.first?.measuredWidth ?: 0
-
-        surfaceView?.let {
-            if (it.second) {
-                if (!rightViews.isNullOrEmpty()) {
-                    rightViewsWidth -= cornerRadius
-                }
-                if (!leftViews.isNullOrEmpty()) {
-                    leftViewsWidth -= cornerRadius
-                }
-            }
-        }
-
-        rightViews?.let {
-            if (it.size > 1) {
-                for (i in 0 until it.size - 1) {
-                    if (it[i].second) {
-                        rightViewsWidth -= cornerRadius
-                    }
-                }
-            }
-        }
-
-        leftViews?.let {
-            if (it.size > 1) {
-                for (i in 0 until it.size - 1) {
-                    if (it[i].second) {
-                        leftViewsWidth -= cornerRadius
-                    }
-                }
-            }
-        }
-
-    }
-
-
-    private fun setViews() {
-        recreateFields()
-
-        for (i in 0 until childCount) {
-            var arrangement = BOTTOM
-            if (i < childrenArrangement?.size ?: 0) {
-                arrangement = childrenArrangement?.get(i) ?: BOTTOM
-            }
-            val child = getChildAt(i)
-            when (arrangement) {
-                SURFACE -> {
-                    surfaceView = Pair(child, false)
-                    (translatableViews as ArrayList<View>).add(child)
-                }
-                SURFACE_ROUNDED -> {
-                    surfaceView = Pair(child, true)
-                    (translatableViews as ArrayList<View>).add(child)
-                }
-                LEFT -> {
-                    (leftViews as ArrayList<Pair<View, Boolean>>).add(Pair(child, false))
-                    (translatableViews as ArrayList<View>).add(child)
-                }
-                RIGHT -> {
-                    (rightViews as ArrayList<Pair<View, Boolean>>).add(Pair(child, false))
-                    (translatableViews as ArrayList<View>).add(child)
-                }
-                BOTTOM -> {
-                    (bottomViews as ArrayList<View>).add(child)
-                }
-                RIGHT_ROUNDED -> {
-                    (rightViews as ArrayList<Pair<View, Boolean>>).add(Pair(child, true))
-                    (translatableViews as ArrayList<View>).add(child)
-                }
-                LEFT_ROUNDED -> {
-                    (leftViews as ArrayList<Pair<View, Boolean>>).add(Pair(child, true))
-                    (translatableViews as ArrayList<View>).add(child)
-                }
-            }
-        }
-    }
-
-    // PIN VIEWS
-
-    private fun pinSurfaceView() {
-        surfaceView?.first?.let { sv ->
-            val set = ConstraintSet()
-            set.clone(this)
-            sv.constraintTopToTopOfParent(set)
-            sv.constraintBottomToBottomOfParent(set)
-            sv.constraintStartToStartOfParent(set)
-            sv.constraintEndToEndOfParent(set)
-            set.applyTo(this)
-        }
-    }
-
-    private fun pinRightView(view: Pair<View, Boolean>) {
-        val v = view.first
-        surfaceView?.first?.let { sv ->
-            lastRightView?.first?.let { rv ->
-                val set = ConstraintSet()
-                set.clone(this)
-                v.constraintTopToTopOf(set, sv)
-                v.constraintBottomToBottomOf(set,sv)
-                v.constraintStartToStartOf(set, rv)
-                set.applyTo(this)
-
-                val lp = v.layoutParams as MarginLayoutParams
-                if (lp.width == ViewGroup.LayoutParams.MATCH_PARENT) {
-                    lp.width = sv.measuredWidth
-                }
-
-                lastRightView?.second?.let { isRounded ->
-                    if (isRounded) {
-                        lp.marginStart = rv.measuredWidth - cornerRadius
-                        //  lp.width = v.measuredWidth + (cornerRadius / 2)
-                    } else {
-                        lp.marginStart = rv.measuredWidth
-                    }
-                }
-
-                v.layoutParams = lp
-                lastRightView = view
-            }
-        }
-    }
-
-    private fun pinLeftView(view: Pair<View, Boolean>) {
-        val v = view.first
-        surfaceView?.first?.let { sv ->
-            lastLeftView?.first?.let { lv ->
-                val set = ConstraintSet()
-                set.clone(this)
-                v.constraintTopToTopOf(set, sv)
-                v.constraintBottomToBottomOf(set,sv)
-                v.constraintEndToEndOf(set, lv)
-                set.applyTo(this)
-
-                val lp = v.layoutParams as MarginLayoutParams
-                if (lp.width == ViewGroup.LayoutParams.MATCH_PARENT) {
-                    lp.width = sv.measuredWidth
-                }
-
-                lastLeftView?.second?.let { isRounded ->
-                    if (isRounded) {
-                        lp.marginEnd = lv.measuredWidth - cornerRadius
-                        //   lp.width = v.measuredWidth + cornerRadius
-                    } else {
-                        lp.marginEnd = lv.measuredWidth
-                    }
-                }
-                v.layoutParams = lp
-                lastLeftView = view
-            }
-        }
-    }
-
-    private fun rearrangeViews() {
-        removeAllViews()
-        bottomViews?.forEach { addView(it) }
-        leftViews?.reversed()?.forEach { addView(it.first) }
-        rightViews?.reversed()?.forEach { addView(it.first) }
-        if (cornerRadius > 0) createOutlineRoundedView()
-        surfaceView?.let { addView(it.first) }
-    }
-
-    private fun createOutlineRoundedView(){
-        val view = OuterRoundedView(context)
-        view.id = View.generateViewId()
-
-        val set = ConstraintSet()
-        set.clone(this)
-        view.constraintTopToTopOfParent(set)
-        view.constraintStartToStartOfParent(set)
-        view.constraintEndToEndOfParent(set)
-        view.constraintBottomToBottomOfParent(set)
-
-        view.setPadding(surfaceView?.first?.marginStart ?: 0, surfaceView?.first?.marginTop ?: 0, surfaceView?.first?.marginEnd ?: 0, surfaceView?.first?.marginBottom ?: 0)
-        addView(view)
-        set.applyTo(this)
-
-        var color = Color.WHITE
-
-        if (parent is View){
-            ((parent as View).background as? ColorDrawable)?.let { color = it.color }
-        }
-        view.create(cornerRadius + 2, color)
-    }
-
-    private fun pinViews() {
-        pinSurfaceView()
-        lastLeftView = surfaceView
-        lastRightView = surfaceView
-
-        rightViews?.forEach { pinRightView(it) }
-        leftViews?.forEach { pinLeftView(it) }
-
-    }
-
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        setViews()
-        rearrangeViews()
-    }
-
-
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        pinViews()
-        measureViewsWidths()
-    }
-
-    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        super.onLayout(changed, left, top, right, bottom)
-        if (changed) {
-            initSwipe()
-        }
-    }
-
-    interface OnSwipeListener {
-        fun onSwipe(progress: Float, direction: SwipeDirection)
-        fun onSwiped(direction: SwipeDirection)
-    }
-
-    enum class ViewArrangement {
-        SURFACE,
-        SURFACE_ROUNDED,
-        BOTTOM,
-        RIGHT_ROUNDED,
-        LEFT_ROUNDED,
-        RIGHT,
-        LEFT
-    }
-
-    enum class SwipeDirection {
-        NONE,
-        LEFT,
-        RIGHT
-    }
-
-    enum class ChildSwipeBehaviour {
-        SEQUENTIALLY,
-        TO_LAST
-    }
-
-    enum class SwipeBehaviour {
-        ONLY_SURFACE_AND_BOTTOM,
-        SWIPE_LOCKED_TO_SIDE_VIEWS,
-        FULL_SWIPE_WITH_SIDE_VIEWS,
-        FULL_SWIPE
-    }
-
-//    if (allowToCompleteShift) {
-//        val rightViewsWidth = rightViews?.map { it.measuredWidth }?.sum() ?: 0
-//        val leftViewsWidth = leftViews?.map { it.measuredWidth }?.sum() ?: 0
-//        maxTranslationLeft = -measuredWidth - rightViewsWidth
-//        maxTranslationRight = measuredWidth + leftViewsWidth
-//    } else {
-//        if (childSwipeBehaviour == ChildSwipeBehaviour.SEQUENTIALLY) {
-//            rightViews?.apply {
-//                if (this.isNotEmpty()) {
-//                    maxTranslationLeft =
-//                        -(rightViews?.get(currentRightIndex)?.measuredWidth ?: 0)
-//                }
-//            }
-//            leftViews?.apply {
-//                if (this.isNotEmpty()) {
-//                    maxTranslationRight = leftViews?.get(currentLeftIndex)?.measuredWidth ?: 0
-//                }
-//            }
-//        }
-//    }
-
-//    when (e.action) {
-//        MotionEvent.ACTION_DOWN -> {
-//            touchX = e.x
-//            true
-//        }
-//        MotionEvent.ACTION_MOVE -> {
-//            val translation = e.x - touchX
-//            if (allowToCompleteShift) {
-//                translateBy(translation)
-//            } else {
-//                if (v.translationX + translation >= maxTranslationLeft && v.translationX + translation <= maxTranslationRight) {
-//                    translateBy(translation)
-//                } else if (v.translationX + translation < maxTranslationLeft) {
-//                    translateTo(maxTranslationLeft.toFloat())
-//                } else if (v.translationX + translation > maxTranslationRight) {
-//                    translateTo(maxTranslationRight.toFloat())
-//                }
-//            }
-//
-//            true
-//        }
-//        MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_UP -> {
-//            var swipeDirection =
-//                SwipeDirection.LEFT
-//            var ratio = if (v.translationX < 0) {
-//                abs(v.translationX / maxTranslationLeft)
-//            } else {
-//                swipeDirection =
-//                    SwipeDirection.RIGHT
-//                abs(v.translationX / maxTranslationRight)
-//            }
-//
-//            if (ratio >= swipeRatio) {
-//                when (swipeDirection) {
-//                    SwipeDirection.LEFT -> {
-//                        animateTranslation(maxTranslationLeft.toFloat())
-//                        unlockNextRightView()
-//                    }
-//                    SwipeDirection.RIGHT -> {
-//                        animateTranslation(maxTranslationRight.toFloat())
-//                        unlockNextLeftView()
-//                    }
-//                }
-//            } else {
-//                reset(true)
-//            }
-//            false
-//        }
-//        else -> false
-//    }
+	private var surfaceView: SwipeView? = null
+	private var leftViews: MutableList<SwipeView> = ArrayList()
+	private var rightViews: MutableList<SwipeView> = ArrayList()
+	private var bottomViews: MutableList<SwipeView> = ArrayList()
+	private var lastRightView: SwipeView? = null
+	private var lastLeftView: SwipeView? = null
+	private var translatableViews: MutableList<SwipeView> = ArrayList()
+
+	// translations
+
+	private var fullTranslationLeft = 0
+	private var fullTranslationRight = 0
+	private var maxTranslationLeft = 0
+	private var maxTranslationRight = 0
+	private var currentMaxTranslationLeft = 0
+	private var currentMaxTranslationRight = 0
+
+	private var currentRightIndex = 0
+	private var currentLeftIndex = 0
+
+
+	private var touchX = 0f
+	private var touchTime = 0L
+	private var swipeRatio = 0.4f
+	private var childrenArrangement: List<ViewArrangement>? = null
+
+	private var childSwipeBehaviour = ChildSwipeBehaviour.NONE
+	private var swipeBehaviour: SwipeBehaviour = SwipeBehaviour.SWIPE_LOCKED_TO_SIDE_VIEWS
+
+	private var lockedSideViews = false
+	private var allowToCompleteShift = true
+	private var canSwipeLeft = CanSwipe.NON_SET
+	private var canSwipeRight = CanSwipe.NON_SET
+	private var swipeDirection: SwipeDirection = SwipeDirection.NONE
+	private var currentSwipeRatio = 0.0f
+
+	private var cornerRadius = 0
+
+	var isMoving = false
+	private var slinkSwipeDetected = false
+	private var isSideViewExpanded = false
+		set(value) {
+			field = value
+			currentSwipeRatio = 0.0f
+		}
+
+	// animations
+	private var isAnimating = false
+	private val animatorSet = AnimatorSet()
+	private val animatorList = ArrayList<Animator>()
+	var slinkSwipeDuration = 750L
+	var swipeDuration = 1000L
+
+	// Listeners
+	private var gestureDetector: GestureDetectorCompat? = null
+	private var swipeListener: OnSwipeListener? = null
+	private var clickListener: OnClickListener? = null
+	private var longClickListener: OnLongClickListener? = null
+	private var onSequentiallyExpandListener: OnSequentiallyExpandListener? = null
+
+	init {
+		initAttrs(context, attrs, defStyleAttr)
+		initGestureListener()
+		initAnimatorListener()
+	}
+
+	private fun initAttrs(context: Context, attrs: AttributeSet?, defStyleAttr: Int) {
+		val a = context.theme.obtainStyledAttributes(
+			attrs,
+			R.styleable.SwipeLayout,
+			defStyleAttr,
+			0
+		)
+		childSwipeBehaviour =
+			ChildSwipeBehaviour.values()[a.getInteger(R.styleable.SwipeLayout_swipeChildBehaviour, 2)]
+		childrenArrangement = a.getString(R.styleable.SwipeLayout_childrenArrangement)?.split(";")
+			?.map { ViewArrangement.valueOf(it) }
+
+		canSwipeLeft = CanSwipe.values()[a.getInteger(R.styleable.SwipeLayout_canSwipeLeft, 2)]
+		canSwipeRight = CanSwipe.values()[a.getInteger(R.styleable.SwipeLayout_canSwipeRight, 2)]
+
+		swipeBehaviour =
+			SwipeBehaviour.values()[a.getInteger(R.styleable.SwipeLayout_swipeBehaviour, 0)]
+
+		cornerRadius = a.getDimensionPixelSize(R.styleable.SwipeLayout_radius, 0)
+		a.recycle()
+	}
+
+	private fun initAnimatorListener() {
+		animatorSet.addListener(object : Animator.AnimatorListener {
+			override fun onAnimationRepeat(animation: Animator?) {}
+			override fun onAnimationEnd(animation: Animator?) {
+				when (surfaceView?.view?.translationX) {
+					0f -> {
+						swipeListener?.onCollapse()
+						isSideViewExpanded = false
+					}
+					maxTranslationLeft.toFloat() -> {
+						if (maxTranslationLeft == fullTranslationLeft) {
+							swipeListener?.onFullSwiped(SwipeDirection.LEFT)
+						} else {
+							isSideViewExpanded = true
+							swipeListener?.onSideViewSwiped(SwipeDirection.LEFT)
+						}
+					}
+					maxTranslationRight.toFloat() -> {
+						if (maxTranslationRight == fullTranslationRight) {
+							swipeListener?.onFullSwiped(SwipeDirection.RIGHT)
+						} else {
+							isSideViewExpanded = true
+							swipeListener?.onSideViewSwiped(SwipeDirection.RIGHT)
+						}
+					}
+					fullTranslationLeft.toFloat() -> {
+						isSideViewExpanded = true
+						swipeListener?.onFullSwiped(SwipeDirection.LEFT)
+					}
+					fullTranslationRight.toFloat() -> {
+						isSideViewExpanded = true
+						swipeListener?.onFullSwiped(SwipeDirection.RIGHT)
+					}
+				}
+				isAnimating = false
+				slinkSwipeDetected = false
+			}
+
+			override fun onAnimationCancel(animation: Animator?) {}
+			override fun onAnimationStart(animation: Animator?) {}
+
+		})
+	}
+
+	private fun initGestureListener() {
+		gestureDetector =
+			GestureDetectorCompat(context, object : GestureDetector.SimpleOnGestureListener() {
+				override fun onDown(e: MotionEvent?): Boolean {
+					isMoving = false
+					touchX = e?.x ?: 0f
+					touchTime = System.currentTimeMillis()
+					return true
+				}
+
+				override fun onSingleTapUp(e: MotionEvent?): Boolean {
+					val clickTime = System.currentTimeMillis() - touchTime
+					if (e?.action == MotionEvent.ACTION_UP && clickTime < 100) {
+						clickListener?.setOnClickListener()
+					}
+					return false
+				}
+
+				override fun onScroll(e1: MotionEvent?, e2: MotionEvent?, distanceX: Float, distanceY: Float): Boolean {
+					if (abs(distanceY) < 5f) {
+						parent.requestDisallowInterceptTouchEvent(true)
+					}
+					return false
+				}
+
+				override fun onFling(
+					p0: MotionEvent?,
+					p1: MotionEvent?,
+					p2: Float,
+					p3: Float
+				): Boolean {
+					if (allowToCompleteShift && !isAnimating) {
+						if (abs(p2) > 1500f) {
+							slinkSwipeDetected = true
+							if (p2 > 0f) {
+								swipeDirection = SwipeDirection.RIGHT
+								animateTranslation(fullTranslationRight.toFloat(), slinkSwipeDuration, lockedSideViews)
+							} else {
+								animateTranslation(fullTranslationLeft.toFloat(), slinkSwipeDuration, lockedSideViews)
+								swipeDirection = SwipeDirection.LEFT
+							}
+						}
+					}
+					return false
+				}
+
+				override fun onLongPress(e: MotionEvent?) {
+					if (!isMoving) {
+						longClickListener?.setOnLongClickListener()
+					}
+				}
+			})
+	}
+
+	private fun initSwipe() {
+		surfaceView?.view?.setOnTouchListener { v, e ->
+			gestureDetector?.let {
+				if (it.onTouchEvent(e)) {
+					true
+				} else {
+					onSwipeTouch(v, e)
+				}
+			}
+			true
+		}
+	}
+
+	// Swipe behaviours
+
+	private fun onSwipeTouch(v: View, e: MotionEvent): Boolean {
+		return when (swipeBehaviour) {
+			SwipeBehaviour.ONLY_SURFACE_AND_BOTTOM -> onlySurfaceAndBottomOrFullSwipeBehaviour(v, e)
+			SwipeBehaviour.SWIPE_LOCKED_TO_SIDE_VIEWS -> swipeLockedToSideViewsSwipeBehaviour(v, e)
+			SwipeBehaviour.FULL_SWIPE_WITH_LOCKED_SIDE_VIEWS -> fullSwipeWithLockedSideViewsSwipeBehaviour(v, e)
+			SwipeBehaviour.FULL_SWIPE -> onlySurfaceAndBottomOrFullSwipeBehaviour(v, e)
+			SwipeBehaviour.FULL_SWIPE_SEQUENTIALLY -> fullSwipeSequentiallyBehaviour(v, e)
+		}
+
+	}
+
+	private fun onlySurfaceAndBottomOrFullSwipeBehaviour(v: View, e: MotionEvent): Boolean {
+		return when (e.action) {
+			MotionEvent.ACTION_MOVE -> {
+				if (!isAnimating) {
+					val translation = e.x - touchX
+					val nextTranslation = v.translationX + translation
+					if (abs(translation) > 0) {
+						isMoving = true
+						getSwipeDirectionAndRatio(translation)
+						translateOnMove(translation, nextTranslation, fullTranslationLeft, fullTranslationRight)
+					}
+				}
+				true
+			}
+			MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_UP -> {
+				if (!slinkSwipeDetected) {
+					getSwipeDirectionAndRatio()
+					if (currentSwipeRatio >= swipeRatio) {
+						when (swipeDirection) {
+							SwipeDirection.NONE -> TODO()
+							SwipeDirection.LEFT -> animateTranslation(fullTranslationLeft.toFloat(), swipeDuration)
+							SwipeDirection.RIGHT -> animateTranslation(fullTranslationRight.toFloat(), swipeDuration)
+						}
+					} else {
+						animateTranslation(0f, swipeDuration)
+					}
+				}
+				false
+			}
+			else -> false
+		}
+	}
+
+	private fun swipeLockedToSideViewsSwipeBehaviour(v: View, e: MotionEvent): Boolean {
+		return when (e.action) {
+			MotionEvent.ACTION_MOVE -> {
+				if (!isAnimating) {
+					val translation = e.x - touchX
+					val nextTranslation = v.translationX + translation
+					if (abs(translation) > 0) {
+						isMoving = true
+						when (childSwipeBehaviour) {
+							ChildSwipeBehaviour.SEQUENTIALLY -> {
+								getSwipeDirectionAndRatio(translation, currentMaxTranslationLeft, currentMaxTranslationRight)
+								translateOnMove(translation, nextTranslation, currentMaxTranslationLeft, currentMaxTranslationRight)
+							}
+							ChildSwipeBehaviour.TO_LAST -> {
+								getSwipeDirectionAndRatio(translation, maxTranslationLeft, maxTranslationRight)
+								translateOnMove(translation, nextTranslation, maxTranslationLeft, maxTranslationRight)
+							}
+							ChildSwipeBehaviour.NONE -> TODO()
+						}
+					}
+				}
+				true
+			}
+			MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_UP -> {
+				if (!slinkSwipeDetected) {
+					getSwipeDirectionAndRatio()
+					if (currentSwipeRatio >= swipeRatio) {
+						when (swipeDirection) {
+							SwipeDirection.NONE -> TODO()
+							SwipeDirection.LEFT -> {
+								when (childSwipeBehaviour) {
+									ChildSwipeBehaviour.SEQUENTIALLY -> {
+										animateTranslation(currentMaxTranslationLeft.toFloat(), swipeDuration)
+										unlockNextRightView()
+									}
+									ChildSwipeBehaviour.TO_LAST -> {
+										animateTranslation(maxTranslationLeft.toFloat(), swipeDuration)
+									}
+									ChildSwipeBehaviour.NONE -> TODO()
+								}
+							}
+							SwipeDirection.RIGHT -> {
+								when (childSwipeBehaviour) {
+									ChildSwipeBehaviour.SEQUENTIALLY -> {
+										animateTranslation(currentMaxTranslationRight.toFloat(), swipeDuration)
+										unlockNextLeftView()
+									}
+									ChildSwipeBehaviour.TO_LAST -> {
+										animateTranslation(maxTranslationRight.toFloat(), swipeDuration)
+									}
+									ChildSwipeBehaviour.NONE -> TODO()
+								}
+							}
+						}
+					} else {
+						moveToStart()
+					}
+				}
+				false
+			}
+			else -> false
+		}
+	}
+
+	private fun fullSwipeWithLockedSideViewsSwipeBehaviour(v: View, e: MotionEvent): Boolean {
+		return when (e.action) {
+			MotionEvent.ACTION_MOVE -> {
+				if (!isAnimating) {
+					val translation = e.x - touchX
+					val nextTranslation = v.translationX + translation
+					if (abs(translation) > 0) {
+						isMoving = true
+						if (isSideViewExpanded) {
+							getSwipeDirection(translation)
+							when (swipeDirection) {
+								SwipeDirection.NONE -> TODO()
+								SwipeDirection.LEFT -> {
+									getSwipeDirectionAndRatio(translation, fullTranslationLeft, fullTranslationRight, maxTranslationLeft)
+									translateOnMove(translation, nextTranslation, fullTranslationLeft, fullTranslationRight, true)
+								}
+								SwipeDirection.RIGHT -> {
+									getSwipeDirectionAndRatio(translation, fullTranslationLeft, fullTranslationRight, maxTranslationRight)
+									translateOnMove(translation, nextTranslation, fullTranslationLeft, fullTranslationRight, true)
+								}
+							}
+						} else {
+							getSwipeDirectionAndRatio(translation)
+							translateOnMove(translation, nextTranslation, maxTranslationLeft, maxTranslationRight, true)
+						}
+
+					}
+				}
+				true
+			}
+			MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_UP -> {
+				if (!slinkSwipeDetected && !isAnimating) {
+					if (currentSwipeRatio > swipeRatio) {
+						when (swipeDirection) {
+							SwipeDirection.NONE -> TODO()
+							SwipeDirection.LEFT -> {
+								if (isSideViewExpanded) {
+									animateTranslation(fullTranslationLeft.toFloat(), swipeDuration, true)
+								} else {
+									animateTranslation(maxTranslationLeft.toFloat(), swipeDuration, true)
+								}
+							}
+							SwipeDirection.RIGHT -> {
+								if (isSideViewExpanded) {
+									animateTranslation(fullTranslationRight.toFloat(), swipeDuration, true)
+								} else {
+									animateTranslation(maxTranslationRight.toFloat(), swipeDuration, true)
+								}
+							}
+						}
+
+					} else {
+						if (isSideViewExpanded) {
+							when (swipeDirection) {
+								SwipeDirection.NONE -> {
+								}
+								SwipeDirection.LEFT -> {
+									animateTranslation(maxTranslationLeft.toFloat(), swipeDuration, true)
+								}
+								SwipeDirection.RIGHT -> {
+									animateTranslation(maxTranslationRight.toFloat(), swipeDuration, true)
+								}
+							}
+						} else {
+							isSideViewExpanded = false
+							animateTranslation(0f, swipeDuration, true)
+						}
+					}
+				}
+				false
+			}
+			else -> false
+		}
+	}
+
+	private fun fullSwipeSequentiallyBehaviour(v: View, e: MotionEvent): Boolean {
+		return when (e.action) {
+			MotionEvent.ACTION_MOVE -> {
+				if (!isAnimating) {
+					val translation = e.x - touchX
+					val nextTranslation = v.translationX + translation
+					if (abs(translation) > 0) {
+						isMoving = true
+						if (isSideViewExpanded) {
+							if ((v.translationX == maxTranslationLeft.toFloat() && translation > 0) || (v.translationX == maxTranslationRight.toFloat() && translation < 0)) {
+								isSideViewExpanded = false
+							}
+						}
+						if (isSideViewExpanded) {
+							getSwipeDirection(translation)
+							when (swipeDirection) {
+								SwipeDirection.NONE -> TODO()
+								SwipeDirection.LEFT -> {
+									getSwipeDirectionAndRatio(translation, fullTranslationLeft, fullTranslationRight, maxTranslationLeft)
+									translateOnMove(translation, nextTranslation, fullTranslationLeft, fullTranslationRight)
+								}
+								SwipeDirection.RIGHT -> {
+									getSwipeDirectionAndRatio(translation, fullTranslationLeft, fullTranslationRight, maxTranslationRight)
+									translateOnMove(translation, nextTranslation, fullTranslationLeft, fullTranslationRight)
+								}
+							}
+						} else {
+							getSwipeDirectionAndRatio(translation)
+							translateOnMove(translation, nextTranslation, maxTranslationLeft, maxTranslationRight)
+						}
+					}
+				}
+				true
+			}
+			MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_UP -> {
+				parent.requestDisallowInterceptTouchEvent(false)
+				if (!slinkSwipeDetected && !isAnimating) {
+					if (currentSwipeRatio > swipeRatio) {
+						when (swipeDirection) {
+							SwipeDirection.NONE -> TODO()
+							SwipeDirection.LEFT -> {
+								if (isSideViewExpanded) {
+									animateTranslation(fullTranslationLeft.toFloat(), swipeDuration)
+								} else {
+									isSideViewExpanded = true
+									animateTranslation(maxTranslationLeft.toFloat(), swipeDuration)
+								}
+							}
+							SwipeDirection.RIGHT -> {
+								if (isSideViewExpanded) {
+									animateTranslation(fullTranslationRight.toFloat(), swipeDuration)
+								} else {
+									isSideViewExpanded = true
+									animateTranslation(maxTranslationRight.toFloat(), swipeDuration)
+								}
+							}
+						}
+
+					} else {
+						if (isSideViewExpanded) {
+							when (swipeDirection) {
+								SwipeDirection.NONE -> {
+								}
+								SwipeDirection.LEFT -> {
+									animateTranslation(maxTranslationLeft.toFloat(), swipeDuration)
+								}
+								SwipeDirection.RIGHT -> {
+									animateTranslation(maxTranslationRight.toFloat(), swipeDuration)
+								}
+							}
+						} else {
+							isSideViewExpanded = false
+							animateTranslation(0f, swipeDuration)
+						}
+					}
+				}
+				false
+			}
+			else -> false
+		}
+	}
+
+	private fun translateOnMove(
+		translation: Float, nextTranslation: Float,
+		maxTranslationLeft: Int,
+		maxTranslationRight: Int,
+		special: Boolean = false
+	) {
+		if (nextTranslation >= maxTranslationLeft && nextTranslation <= maxTranslationRight) {
+			if (special) {
+				specialTranslateBy(translation)
+			} else {
+				translateBy(translation)
+			}
+		} else if (nextTranslation < maxTranslationLeft) {
+			if (special) {
+				specialTranslateTo(maxTranslationLeft.toFloat())
+			} else {
+				translateTo(maxTranslationLeft.toFloat())
+			}
+
+		} else if (nextTranslation > maxTranslationRight) {
+			if (special) {
+				specialTranslateTo(maxTranslationRight.toFloat())
+			} else {
+				translateTo(maxTranslationRight.toFloat())
+			}
+		}
+	}
+
+	private fun getSwipeDirection(translation: Float) {
+		surfaceView?.view?.let { v ->
+			swipeDirection = when {
+				v.translationX + translation > 0 -> {
+					SwipeDirection.RIGHT
+				}
+				v.translationX + translation < 0 -> {
+					SwipeDirection.LEFT
+				}
+				else -> SwipeDirection.NONE
+			}
+		}
+	}
+
+	private fun getSwipeDirectionAndRatio(
+		translation: Float = 0f,
+		maxTranslationLeft: Int = this.maxTranslationLeft,
+		maxTranslationRight: Int = this.maxTranslationRight,
+		shift: Int = 0
+	) {
+		var maxLeft = maxTranslationLeft
+		var maxRight = maxTranslationRight
+		if (shift > 0) {
+			val svWidth = surfaceView?.view?.measuredWidth ?: 0
+			maxRight = svWidth - shift
+		} else if (shift < 0) {
+			val svWidth = surfaceView?.view?.measuredWidth ?: 0
+			maxLeft = -svWidth - shift
+		}
+		surfaceView?.view?.let { v ->
+			swipeDirection = when {
+				v.translationX + translation > 0 -> {
+					currentSwipeRatio = (v.translationX - shift) / maxRight.toFloat()
+					SwipeDirection.RIGHT
+				}
+				v.translationX + translation < 0 -> {
+					currentSwipeRatio = (v.translationX - shift) / maxLeft.toFloat()
+					SwipeDirection.LEFT
+				}
+				else -> SwipeDirection.NONE
+			}
+
+			swipeListener?.onSwipe(currentSwipeRatio, swipeDirection)
+		}
+	}
+
+	private fun moveToStart() {
+		currentLeftIndex = 0
+		currentRightIndex = 0
+		onSequentiallyExpandListener?.onNext(0, SwipeDirection.NONE)
+		onSequentiallyExpandListener?.onReset()
+		initSwipeChildBehaviour()
+		animateTranslation(0f, swipeDuration)
+	}
+
+	private fun unlockNextRightView() {
+		if (currentRightIndex + 1 < rightViews.size) {
+			currentRightIndex++
+			currentMaxTranslationLeft -= rightViews[currentRightIndex].view.measuredWidth
+			if (rightViews[currentRightIndex - 1].isRounded) {
+				currentMaxTranslationLeft += cornerRadius
+			}
+			onSequentiallyExpandListener?.onNext(currentRightIndex, SwipeDirection.LEFT)
+		}
+	}
+
+	private fun unlockNextLeftView() {
+		if (currentLeftIndex + 1 < leftViews.size) {
+			currentLeftIndex++
+			currentMaxTranslationRight += leftViews[currentLeftIndex].view.measuredWidth
+
+			if (leftViews[currentLeftIndex - 1].isRounded) {
+				currentMaxTranslationRight -= cornerRadius
+			}
+			onSequentiallyExpandListener?.onNext(currentLeftIndex, SwipeDirection.RIGHT)
+		}
+	}
+
+// translate methods
+    /**
+     * @param duration means duration of the animation swipe
+     *
+     */
+	fun fullExpandLeft(duration: Long = 1000) {
+		if (canSwipeLeft == CanSwipe.TRUE) {
+			animateTranslation(fullTranslationLeft.toFloat(), duration)
+		}
+	}
+
+	fun fullExpandRight(duration: Long = 1000) {
+		if (canSwipeLeft == CanSwipe.TRUE) {
+			animateTranslation(fullTranslationLeft.toFloat(), duration)
+		}
+	}
+
+	fun expandLeft(duration: Long = 500) {
+		if (canSwipeLeft == CanSwipe.TRUE) {
+			animateTranslation(maxTranslationLeft.toFloat(), duration)
+		}
+	}
+
+	fun expandRight(duration: Long = 500) {
+		if (canSwipeLeft == CanSwipe.TRUE) {
+			animateTranslation(maxTranslationRight.toFloat(), duration)
+		}
+	}
+
+
+	fun reset(animation: Boolean) {
+		if (animation) {
+			animateTranslation(0f, 1000)
+		} else {
+			translateTo(0f)
+		}
+
+		currentRightIndex = 0
+		currentLeftIndex = 0
+	}
+
+	private fun animateTranslation(
+		translation: Float,
+		animDuration: Long,
+		special: Boolean = false
+	) {
+		animatorList.clear()
+		isAnimating = true
+
+		if (special) {
+			when (translation.toInt()) {
+				0 -> {
+					translatableViews.forEach {
+						animatorList.add(createAnimator(it.view, it.startX + translation))
+					}
+				}
+				maxTranslationRight, maxTranslationLeft -> {
+					translatableViews.forEach {
+						animatorList.add(createAnimator(it.view, it.startX + translation))
+					}
+				}
+				fullTranslationLeft, fullTranslationRight -> {
+					surfaceView?.let {
+						animatorList.add(createAnimator(it.view, it.startX + translation))
+					}
+					when (swipeDirection) {
+						SwipeDirection.NONE -> TODO()
+						SwipeDirection.LEFT -> {
+							rightViews.forEach {
+								animatorList.add(createAnimator(it.view, it.startX + maxTranslationLeft))
+							}
+							leftViews.forEach {
+								animatorList.add(createAnimator(it.view, it.startX + maxTranslationLeft))
+							}
+						}
+						SwipeDirection.RIGHT -> {
+							rightViews.forEach {
+								animatorList.add(createAnimator(it.view, it.startX + maxTranslationRight))
+							}
+							leftViews.forEach {
+								animatorList.add(createAnimator(it.view, it.startX + maxTranslationRight))
+							}
+						}
+					}
+
+				}
+			}
+		} else {
+			translatableViews.forEach {
+				animatorList.add(createAnimator(it.view, it.startX + translation))
+			}
+		}
+
+
+		animatorSet.apply {
+			playTogether(animatorList)
+			duration = animDuration
+			interpolator = FastOutSlowInInterpolator()
+			start()
+		}
+	}
+
+	private fun createAnimator(view: View, translation: Float): ValueAnimator {
+		val animator = ValueAnimator.ofFloat(view.translationX, translation)
+		animator.addUpdateListener {
+			view.translationX = it.animatedValue as Float
+		}
+		return animator
+	}
+
+	private fun translateBy(translation: Float) {
+		translatableViews.forEach {
+			it.view.translateBy(translation)
+		}
+	}
+
+	private fun specialTranslateBy(translation: Float) {
+		surfaceView?.view?.let { surfaceView ->
+			if ((surfaceView.translationX + translation < maxTranslationLeft) || (surfaceView.translationX + translation > maxTranslationRight)) {
+				if (!isSideViewExpanded) {
+					when (swipeDirection) {
+						SwipeDirection.NONE -> TODO()
+						SwipeDirection.LEFT -> translateTo(maxTranslationLeft.toFloat())
+						SwipeDirection.RIGHT -> translateTo(maxTranslationRight.toFloat())
+					}
+					isSideViewExpanded = true
+				} else {
+					surfaceView.translateBy(translation)
+				}
+
+			} else {
+				if (isSideViewExpanded) {
+					when (swipeDirection) {
+						SwipeDirection.NONE -> TODO()
+						SwipeDirection.LEFT -> translateTo(maxTranslationLeft.toFloat())
+						SwipeDirection.RIGHT -> translateTo(maxTranslationRight.toFloat())
+					}
+					isSideViewExpanded = false
+				} else {
+					translateBy(translation)
+				}
+			}
+		}
+	}
+
+	private fun translateTo(translation: Float) {
+		translatableViews.forEach {
+			it.view.translateTo(it.startX + translation)
+		}
+	}
+
+	private fun specialTranslateTo(translation: Float) {
+		surfaceView?.let { surfaceView ->
+			if ((surfaceView.view.translationX + translation < maxTranslationLeft) || (surfaceView.view.translationX + translation > maxTranslationRight)) {
+				if (!isSideViewExpanded) {
+					when (swipeDirection) {
+						SwipeDirection.NONE -> TODO()
+						SwipeDirection.LEFT -> translateTo(maxTranslationLeft.toFloat())
+						SwipeDirection.RIGHT -> translateTo(maxTranslationRight.toFloat())
+					}
+					isSideViewExpanded = true
+				} else {
+					surfaceView.view.translateTo(surfaceView.startX + translation)
+				}
+			} else {
+				if (isSideViewExpanded) {
+					when (swipeDirection) {
+						SwipeDirection.NONE -> TODO()
+						SwipeDirection.LEFT -> translateTo(maxTranslationLeft.toFloat())
+						SwipeDirection.RIGHT -> translateTo(maxTranslationRight.toFloat())
+					}
+					isSideViewExpanded = false
+				} else {
+					translateTo(translation)
+				}
+
+			}
+		}
+	}
+
+	// init methods
+
+	private fun measureTranslations() {
+		if (swipeBehaviour == SwipeBehaviour.ONLY_SURFACE_AND_BOTTOM) {
+			rightViews.forEach { removeView(it.view) }
+			leftViews.forEach { removeView(it.view) }
+			rightViews.clear()
+			leftViews.clear()
+		}
+
+		setCanSwipeLeft()
+		setCanSwipeRight()
+
+		surfaceView?.let { surfaceView ->
+			val surfaceViewWidth =
+				surfaceView.view.measuredWidth - (surfaceView.view.marginStart + surfaceView.view.marginEnd)
+			if (canSwipeLeft == CanSwipe.TRUE) {
+				if (rightViews.isEmpty() && swipeBehaviour == SwipeBehaviour.ONLY_SURFACE_AND_BOTTOM) {
+					maxTranslationLeft = -surfaceViewWidth
+					fullTranslationLeft = maxTranslationLeft
+				} else if (rightViews.isNotEmpty()) {
+					val rightViewsWidth = rightViews.map { it.view.measuredWidth }.sum()
+					maxTranslationLeft = -(rightViewsWidth) + cornerRadius
+
+					if (rightViews.size > 1) {
+						for (i in 0..rightViews.size - 2) {
+							if (rightViews[i].isRounded) {
+								maxTranslationLeft += cornerRadius
+							}
+						}
+					}
+					fullTranslationLeft = maxTranslationLeft - surfaceViewWidth
+				}
+			}
+
+			if (canSwipeRight == CanSwipe.TRUE) {
+				if (leftViews.isEmpty() && swipeBehaviour == SwipeBehaviour.ONLY_SURFACE_AND_BOTTOM) {
+					maxTranslationRight = surfaceViewWidth
+					fullTranslationRight = maxTranslationRight
+				} else if (leftViews.isNotEmpty()) {
+					val leftViewsWidth = leftViews.map { it.view.measuredWidth }.sum()
+					maxTranslationRight = leftViewsWidth - cornerRadius
+					if (leftViews.size > 1) {
+						for (i in 0..leftViews.size - 2) {
+							if (leftViews[i].isRounded) maxTranslationRight -= cornerRadius
+						}
+					}
+
+					fullTranslationRight = maxTranslationRight + surfaceViewWidth + cornerRadius
+				}
+			}
+		}
+	}
+
+	private fun initBehaviours() {
+		when (swipeBehaviour) {
+			SwipeBehaviour.ONLY_SURFACE_AND_BOTTOM -> {
+				allowToCompleteShift = true
+				maxTranslationLeft = fullTranslationLeft
+				maxTranslationRight = fullTranslationRight
+			}
+			SwipeBehaviour.SWIPE_LOCKED_TO_SIDE_VIEWS -> {
+				allowToCompleteShift = false
+				initSwipeChildBehaviour()
+			}
+			SwipeBehaviour.FULL_SWIPE_WITH_LOCKED_SIDE_VIEWS -> {
+				allowToCompleteShift = true
+				lockedSideViews = true
+				initSwipeChildBehaviour()
+			}
+			SwipeBehaviour.FULL_SWIPE -> {
+				allowToCompleteShift = true
+				maxTranslationLeft = fullTranslationLeft
+				maxTranslationRight = fullTranslationRight
+			}
+			SwipeBehaviour.FULL_SWIPE_SEQUENTIALLY -> {
+				allowToCompleteShift = true
+			}
+		}
+	}
+
+	private fun initSwipeChildBehaviour() {
+		when (childSwipeBehaviour) {
+			ChildSwipeBehaviour.SEQUENTIALLY -> {
+				if (leftViews.isNotEmpty()) {
+					currentMaxTranslationRight = leftViews[0].view.measuredWidth - cornerRadius
+				}
+				if (rightViews.isNotEmpty()) {
+					currentMaxTranslationLeft = -rightViews[0].view.measuredWidth + cornerRadius
+				}
+			}
+			ChildSwipeBehaviour.TO_LAST -> {
+			} // Don't need implement
+			ChildSwipeBehaviour.NONE -> {
+			} // Don't need implement
+		}
+	}
+
+	private fun setCanSwipeLeft() {
+		if (canSwipeLeft == CanSwipe.NON_SET) {
+			canSwipeLeft = CanSwipe.TRUE
+		}
+	}
+
+	private fun setCanSwipeRight() {
+		if (canSwipeRight == CanSwipe.NON_SET) {
+			canSwipeRight = CanSwipe.TRUE
+		}
+	}
+
+// PIN VIEWS
+
+	private fun setViews() {
+		for (i in 0 until childCount) {
+			var arrangement = ViewArrangement.BOTTOM
+			if (i < childrenArrangement?.size ?: 0) {
+				arrangement = childrenArrangement?.get(i) ?: ViewArrangement.BOTTOM
+			}
+			val child = getChildAt(i)
+			when (arrangement) {
+				ViewArrangement.SURFACE -> {
+					ViewCompat.setTranslationZ(child, (childCount * 4f) + 4f)
+					val v = SwipeView(child)
+					surfaceView = v
+					translatableViews.add(v)
+				}
+				ViewArrangement.SURFACE_ROUNDED -> {
+					ViewCompat.setTranslationZ(child, (childCount * 4f) + 4f)
+					val v = SwipeView(child, true)
+					surfaceView = v
+					translatableViews.add(v)
+				}
+				ViewArrangement.LEFT -> {
+					ViewCompat.setTranslationZ(child, ((childCount - i) * 4f))
+					val v = SwipeView(child)
+					translatableViews.add(v)
+					leftViews.add(v)
+				}
+				ViewArrangement.RIGHT -> {
+					ViewCompat.setTranslationZ(child, ((childCount - i) * 4f))
+					val v = SwipeView(child)
+					translatableViews.add(v)
+					rightViews.add(v)
+				}
+				ViewArrangement.BOTTOM -> {
+					val v = SwipeView(child)
+					bottomViews.add(v)
+				}
+				ViewArrangement.RIGHT_ROUNDED -> {
+					ViewCompat.setTranslationZ(child, ((childCount - i) * 4f))
+					val v = SwipeView(child, true)
+					translatableViews.add(v)
+					rightViews.add(v)
+				}
+				ViewArrangement.LEFT_ROUNDED -> {
+					ViewCompat.setTranslationZ(child, ((childCount - i) * 4f))
+					val v = SwipeView(child, true)
+					translatableViews.add(v)
+					leftViews.add(v)
+				}
+				ViewArrangement.IGNORE -> {
+					ViewCompat.setTranslationZ(child, (childCount * 4f) + 2f)
+				}
+			}
+		}
+	}
+
+// arrange views
+
+	private fun pinRightView(view: SwipeView) {
+		val v = view.view
+		surfaceView?.view?.let { sv ->
+			lastRightView?.view?.let { rv ->
+				v.x = rv.marginStart + rv.x + rv.measuredWidth.toFloat() - rv.paddingEnd
+				lastRightView?.isRounded?.let { isRounded ->
+					if (isRounded) {
+						v.x = v.x - cornerRadius
+					}
+				}
+				view.startX = v.x
+				lastRightView = view
+			}
+		}
+	}
+
+	private fun pinLeftView(view: SwipeView) {
+		val v = view.view
+		surfaceView?.view?.let { sv ->
+			lastLeftView?.view?.let { lv ->
+				v.x = (lv.x - v.measuredWidth.toFloat()) + lv.marginEnd + lv.paddingStart
+				lastLeftView?.isRounded?.let { isRounded ->
+					if (isRounded) {
+						v.x = v.x + cornerRadius
+					}
+				}
+				view.startX = v.x
+				lastLeftView = view
+			}
+		}
+	}
+
+	private fun pinViews() {
+		lastLeftView = surfaceView
+		lastRightView = surfaceView
+
+		rightViews.forEach { pinRightView(it) }
+		leftViews.forEach { pinLeftView(it) }
+
+	}
+
+// override methods
+
+	private fun onRestart() {
+		translatableViews.forEach { it.view.translateTo(0f) }
+
+		fullTranslationLeft = 0
+		fullTranslationRight = 0
+		maxTranslationLeft = 0
+		maxTranslationRight = 0
+		currentMaxTranslationLeft = 0
+		currentMaxTranslationRight = 0
+
+		currentRightIndex = 0
+		currentLeftIndex = 0
+
+		touchX = 0f
+		touchTime = 0L
+		swipeRatio = 0.4f
+
+		swipeDirection = SwipeDirection.NONE
+		currentSwipeRatio = 0.0f
+
+		isMoving = false
+		slinkSwipeDetected = false
+		isSideViewExpanded = false
+
+		isAnimating = false
+		animatorSet.cancel()
+		animatorList.clear()
+		leftViews.clear()
+		rightViews.clear()
+		bottomViews.clear()
+		translatableViews.clear()
+	}
+
+	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+		super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+		onRestart()
+		setViews()
+		pinViews()
+	}
+
+	override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+		super.onLayout(changed, left, top, right, bottom)
+		measureTranslations()
+		initBehaviours()
+		initSwipe()
+	}
+
+// listeners
+
+	fun setOnSwipeListener(swipeListener: OnSwipeListener) {
+		this.swipeListener = swipeListener
+	}
+
+	inline fun setOnSwipeListener(
+		crossinline onSwipe: (progress: Float, direction: SwipeDirection) -> Unit,
+		crossinline onFullSwiped: (direction: SwipeDirection) -> Unit,
+		crossinline onSideViewSwiped: (direction: SwipeDirection) -> Unit,
+		crossinline onCollapse: () -> Unit
+	) {
+		setOnSwipeListener(object :
+			OnSwipeListener {
+			override fun onSwipe(progress: Float, direction: SwipeDirection) {
+				onSwipe(progress, direction)
+			}
+
+			override fun onFullSwiped(direction: SwipeDirection) {
+				onFullSwiped(direction)
+			}
+
+			override fun onSideViewSwiped(direction: SwipeDirection) {
+				onSideViewSwiped(direction)
+			}
+
+			override fun onCollapse() {
+				onCollapse()
+			}
+
+		})
+	}
+
+	fun setOnClickListener(clickListener: OnClickListener) {
+		this.clickListener = clickListener
+	}
+
+	fun setOnClickListener(
+		onClick: () -> Unit
+	) {
+		setOnClickListener(object : OnClickListener {
+			override fun setOnClickListener() {
+				onClick()
+			}
+
+		})
+	}
+
+	fun setOnLongClickListener(longClickListener: OnLongClickListener) {
+		this.longClickListener = longClickListener
+	}
+
+	fun setOnLongClickListener(
+		onLongClick: () -> Unit
+	) {
+		setOnLongClickListener(object : OnLongClickListener {
+			override fun setOnLongClickListener() {
+				onLongClick()
+			}
+
+		})
+	}
+
+	fun setOnSequentiallyExpandListener(onSequentiallyExpandListener: OnSequentiallyExpandListener) {
+		this.onSequentiallyExpandListener = onSequentiallyExpandListener
+	}
+
+	inline fun setOnSequentiallyExpandListener(
+		crossinline onNext: (position: Int, direction: SwipeDirection) -> Unit,
+		crossinline onReset: () -> Unit
+	) {
+		setOnSequentiallyExpandListener(object : OnSequentiallyExpandListener {
+			override fun onNext(position: Int, direction: SwipeDirection) {
+				onNext(position, direction)
+			}
+
+			override fun onReset() {
+				onReset()
+			}
+
+		})
+	}
+
+	interface OnSwipeListener {
+		fun onSwipe(progress: Float, direction: SwipeDirection)
+		fun onFullSwiped(direction: SwipeDirection)
+		fun onSideViewSwiped(direction: SwipeDirection)
+		fun onCollapse()
+	}
+
+	interface OnClickListener {
+		fun setOnClickListener()
+	}
+
+	interface OnLongClickListener {
+		fun setOnLongClickListener()
+	}
+
+	interface OnSequentiallyExpandListener {
+		fun onNext(position: Int, direction: SwipeDirection)
+		fun onReset()
+	}
+
+	enum class ViewArrangement {
+		SURFACE,
+		SURFACE_ROUNDED,
+		BOTTOM,
+		RIGHT_ROUNDED,
+		LEFT_ROUNDED,
+		RIGHT,
+		LEFT,
+		IGNORE
+	}
+
+	enum class SwipeDirection {
+		NONE,
+		LEFT,
+		RIGHT
+	}
+
+	enum class CanSwipe {
+		FALSE,
+		TRUE,
+		NON_SET
+	}
+
+	enum class ChildSwipeBehaviour {
+		SEQUENTIALLY,
+		TO_LAST,
+		NONE
+	}
+
+	enum class SwipeBehaviour {
+		ONLY_SURFACE_AND_BOTTOM,
+		SWIPE_LOCKED_TO_SIDE_VIEWS,
+		FULL_SWIPE_WITH_LOCKED_SIDE_VIEWS,
+		FULL_SWIPE,
+		FULL_SWIPE_SEQUENTIALLY
+	}
+
+	companion object {
+
+		val TAG: String = this::class.java.simpleName
+
+		private class SwipeView(
+			var view: View,
+			var isRounded: Boolean = false,
+			var startX: Float = 0.0f
+		)
+	}
 
 }

@@ -255,12 +255,28 @@
     
     <declare-styleable name="SwipeLayout">
         <attr name="childrenArrangement" format="string"/>
-        <attr name="swipeBehaviour" format="enum">
+        <attr name="swipeChildBehaviour" format="enum">
             <enum name="SEQUENTIALLY" value="0" />
             <enum name="TO_LAST" value="1" />
         </attr>
+        <attr name="canSwipeLeft" format="enum">
+            <enum name="false_" value="0" />
+            <enum name="true_" value="1" />
+            <enum name="non_set" value="2" />
+        </attr>
+        <attr name="canSwipeRight" format="enum">
+            <enum name="false_" value="0" />
+            <enum name="true_" value="1" />
+            <enum name="non_set" value="2" />
+        </attr>
+        <attr name="swipeBehaviour" format="enum">
+            <enum name="ONLY_SURFACE_AND_BOTTOM" value="0"/>
+            <enum name="SWIPE_LOCKED_TO_SIDE_VIEWS" value="1"/>
+            <enum name="FULL_SWIPE_WITH_LOCKED_SIDE_VIEWS" value="2"/>
+            <enum name="FULL_SWIPE" value="3"/>
+            <enum name="FULL_SWIPE_SEQUENTIALLY" value="4"/>
+        </attr>
         <attr name="radius" />
-        <attr name="allowToCompleteShift" format="boolean"/>
     </declare-styleable>
 
 </resources>
